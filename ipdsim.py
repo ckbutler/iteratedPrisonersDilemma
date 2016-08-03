@@ -116,25 +116,38 @@ GRIM = {
 }                     # So, the history structure should track this.
 # These dictionaries can then be assigned to agents, perhaps with other
 # attributes such as initial score:
+id = 0
 agents = []
 for i in range(numberOf_allC):
-  agents.append( ( allC, 0 ) )
+  id += 1
+  agent = {'id':id,'score':0}
+  agent.update(allC)
+  agents.append(agent)
 for i in range(numberOf_allD):
-  agents.append( ( allD, 0 ) )
+  id += 1
+  agent = {'id':id,'score':0}
+  agent.update(allD)
+  agents.append(agent)
 for i in range(numberOf_TFT):
-  agents.append( ( TFT, 0 ) )
+  id += 1
+  agent = {'id':id,'score':0}
+  agent.update(TFT)
+  agents.append(agent)
 for i in range(numberOf_TFTd):
-  agents.append( ( TFTd, 0 ) )
+  id += 1
+  agent = {'id':id,'score':0}
+  agent.update(TFTd)
+  agents.append(agent)
 for i in range(numberOf_TFTdc):
-  agents.append( ( TFTdc, 0 ) )
+  id += 1
+  agent = {'id':id,'score':0}
+  agent.update(TFTdc)
+  agents.append(agent)
 for i in range(numberOf_GRIM):
-  agents.append( ( GRIM, 0 ) )
-
-# agents[i][0] represents agent i's strategy;
-# agents[i][1] represents agent i's cumulative score.
-
-
-
+  id += 1
+  agent = {'id':id,'score':0}
+  agent.update(GRIM)
+  agents.append(agent)
 
 # Create structures for tracking play:
 distribution = [
@@ -157,13 +170,13 @@ def updateDistribution():
     count_TFTd  = 0
     count_TFTdc = 0
     count_GRIM  = 0
-    for type,score in agents:
-        if type['abbr'] == 'allC' : count_allC  += 1
-        if type['abbr'] == 'allD' : count_allD  += 1
-        if type['abbr'] == 'TFT'  : count_TFT   += 1
-        if type['abbr'] == 'TFTd' : count_TFTd  += 1
-        if type['abbr'] == 'TFTdc': count_TFTdc += 1
-        if type['abbr'] == 'GRIM' : count_GRIM  += 1
+    for agent in agents:
+        if agent['abbr'] == 'allC' : count_allC  += 1
+        if agent['abbr'] == 'allD' : count_allD  += 1
+        if agent['abbr'] == 'TFT'  : count_TFT   += 1
+        if agent['abbr'] == 'TFTd' : count_TFTd  += 1
+        if agent['abbr'] == 'TFTdc': count_TFTdc += 1
+        if agent['abbr'] == 'GRIM' : count_GRIM  += 1
     tuple = (
         (allC , count_allC),
         (allD , count_allD),
@@ -180,7 +193,20 @@ def printCurrentDistributionAsWholeTable():
     for type,count in currentDistribution:
         print("%25s : %5d" % (type['name'],count) )
 
-# One play of the PD game, returning useful information:
+
+# Create list of id-pairings such that each agent is paired once with every
+# other agent and never with itself:
+def pairingList():
+    pL = []
+    for agent_R in agents:
+        for agent_C in agents:
+            if agent_R['id']!=agent_C['id'] and agent_R['id'] > agent_C['id']:
+                pL.append( (agent_R['id'], agent_C['id']) )
+    return(pL)
+
+# Play iterations of the PD game, updating score of agents:
+def playIPDgame():
+    return(0)
 
 
 # Culling and seeding at the end of a period:
@@ -191,7 +217,12 @@ def printCurrentDistributionAsWholeTable():
 
 ############################ CORE SIMULATION BEGINS ############################
 # 1 - Pair each agent i with each *other* agent j to play the stage game t times
-
+listOfPairings = pairingList()
+for (a,b) in listOfPairings:
+    [agentA] = filter(lambda agent: agent['id'] == a, agents)
+    [agentB] = filter(lambda agent: agent['id'] == b, agents)
+    print(agentA['abbr'],agentB['abbr'])
+exit()
 
 # 2 - Once all loops for (1) are complete, sort by score, cull and seed
 
@@ -199,7 +230,23 @@ def printCurrentDistributionAsWholeTable():
 # 3 - Do (1) and (2) over p periods, outputing changed distribution of
 #     strategies for each period
 distribution.append(updateDistribution())
-if VERBOSE: printCurrentDistributionAsWholeTable()
+
+# For error checking:
+if VERBOSE:
+    printCurrentDistributionAsWholeTable()
+    appropriatePairings = (len(agents)**2 - len(agents))/2
+    if appropriatePairings == len(pairingList()):
+        print(
+            "Appropriate pairings (%d) equals list of pairings (%d)"
+            %
+            ( appropriatePairings, len(pairingList()) )
+        )
+    else:
+        print(
+            "!!! Appropriate pairings (%d) DOES NOT equal list of pairings (%d)"
+            %
+            ( appropriatePairings, len(pairingList()) )
+        )
 
 ############################# CORE SIMULATION ENDS #############################
 
@@ -211,4 +258,6 @@ if VERBOSE: printCurrentDistributionAsWholeTable()
 # ---------- ----------- -------------------------------------------------------
 # 08-02-2016 CK Butler   Created file with commented outline of components
 #                        Added strategy dictionaries and some error checking
-# 08-03-2016 CK Butler
+# 08-03-2016 CK Butler   Created agents' list & function for counting strategies
+#                        Changed agents' structure to be dictionaries
+#                        Created function for appropriate pairings per period
