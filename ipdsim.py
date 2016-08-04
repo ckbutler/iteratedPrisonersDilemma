@@ -16,6 +16,7 @@
 
 import sys
 import random
+import networkx as nx
 
 VERBOSE = True
 
@@ -114,40 +115,40 @@ GRIM = {
   'react_D':   'D',
   'reactEverD':'D'    # If the opponent ever played D, GRIM always plays D.
 }                     # So, the history structure should track this.
-# These dictionaries can then be assigned to agents, perhaps with other
+# These dictionaries can then be assigned to agents, with other
 # attributes such as initial score:
-id = 0
 agents = []
 for i in range(numberOf_allC):
-  id += 1
-  agent = {'id':id,'score':0}
+  agent = {'score':0}
   agent.update(allC)
   agents.append(agent)
 for i in range(numberOf_allD):
-  id += 1
-  agent = {'id':id,'score':0}
+  agent = {'score':0}
   agent.update(allD)
   agents.append(agent)
 for i in range(numberOf_TFT):
-  id += 1
-  agent = {'id':id,'score':0}
+  agent = {'score':0}
   agent.update(TFT)
   agents.append(agent)
 for i in range(numberOf_TFTd):
-  id += 1
-  agent = {'id':id,'score':0}
+  agent = {'score':0}
   agent.update(TFTd)
   agents.append(agent)
 for i in range(numberOf_TFTdc):
-  id += 1
-  agent = {'id':id,'score':0}
+  agent = {'score':0}
   agent.update(TFTdc)
   agents.append(agent)
 for i in range(numberOf_GRIM):
-  id += 1
-  agent = {'id':id,'score':0}
+  agent = {'score':0}
   agent.update(GRIM)
   agents.append(agent)
+H = nx.complete_graph(len(agents))
+G = nx.Graph()
+for i,agent in enumerate(agents):
+    G.add_node(i,agent)
+G.add_edges_from(H.edges())
+
+
 
 # Create structures for tracking play:
 distribution = [
@@ -170,13 +171,13 @@ def updateDistribution():
     count_TFTd  = 0
     count_TFTdc = 0
     count_GRIM  = 0
-    for agent in agents:
-        if agent['abbr'] == 'allC' : count_allC  += 1
-        if agent['abbr'] == 'allD' : count_allD  += 1
-        if agent['abbr'] == 'TFT'  : count_TFT   += 1
-        if agent['abbr'] == 'TFTd' : count_TFTd  += 1
-        if agent['abbr'] == 'TFTdc': count_TFTdc += 1
-        if agent['abbr'] == 'GRIM' : count_GRIM  += 1
+    for n in G:
+        if G.node[n]['abbr'] == 'allC' : count_allC  += 1
+        if G.node[n]['abbr'] == 'allD' : count_allD  += 1
+        if G.node[n]['abbr'] == 'TFT'  : count_TFT   += 1
+        if G.node[n]['abbr'] == 'TFTd' : count_TFTd  += 1
+        if G.node[n]['abbr'] == 'TFTdc': count_TFTdc += 1
+        if G.node[n]['abbr'] == 'GRIM' : count_GRIM  += 1
     tuple = (
         (allC , count_allC),
         (allD , count_allD),
@@ -194,16 +195,6 @@ def printCurrentDistributionAsWholeTable():
         print("%25s : %5d" % (type['name'],count) )
 
 
-# Create list of id-pairings such that each agent is paired once with every
-# other agent and never with itself:
-def pairingList():
-    pL = []
-    for agent_R in agents:
-        for agent_C in agents:
-            if agent_R['id']!=agent_C['id'] and agent_R['id'] > agent_C['id']:
-                pL.append( (agent_R['id'], agent_C['id']) )
-    return(pL)
-
 # Play iterations of the PD game, updating score of agents:
 def playIPDgame():
     return(0)
@@ -217,12 +208,7 @@ def playIPDgame():
 
 ############################ CORE SIMULATION BEGINS ############################
 # 1 - Pair each agent i with each *other* agent j to play the stage game t times
-listOfPairings = pairingList()
-for (a,b) in listOfPairings:
-    [agentA] = filter(lambda agent: agent['id'] == a, agents)
-    [agentB] = filter(lambda agent: agent['id'] == b, agents)
-    print(agentA['abbr'],agentB['abbr'])
-exit()
+for
 
 # 2 - Once all loops for (1) are complete, sort by score, cull and seed
 
@@ -234,19 +220,6 @@ distribution.append(updateDistribution())
 # For error checking:
 if VERBOSE:
     printCurrentDistributionAsWholeTable()
-    appropriatePairings = (len(agents)**2 - len(agents))/2
-    if appropriatePairings == len(pairingList()):
-        print(
-            "Appropriate pairings (%d) equals list of pairings (%d)"
-            %
-            ( appropriatePairings, len(pairingList()) )
-        )
-    else:
-        print(
-            "!!! Appropriate pairings (%d) DOES NOT equal list of pairings (%d)"
-            %
-            ( appropriatePairings, len(pairingList()) )
-        )
 
 ############################# CORE SIMULATION ENDS #############################
 
@@ -261,3 +234,4 @@ if VERBOSE:
 # 08-03-2016 CK Butler   Created agents' list & function for counting strategies
 #                        Changed agents' structure to be dictionaries
 #                        Created function for appropriate pairings per period
+# 08-04-2016 CK Butler   Changed structure from lists to networkx
