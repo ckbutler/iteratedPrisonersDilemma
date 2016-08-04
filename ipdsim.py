@@ -22,7 +22,7 @@ from sys import argv
 from random import choice
 import networkx as nx
 
-VERBOSE = True
+VERBOSE = False
 
 # Default values for payoffs, initial distribution of strategies,
 # culling threshold, iteration parameters, and re-seeding method:
@@ -36,13 +36,13 @@ numberOf_allC  =  16   # Always cooperate
 numberOf_allD  =  20   # Always defect
 numberOf_TFT   =  16   # Tit for Tat
 numberOf_TFTd  =  16   # Simple Tester Tit for Tat (defect, then Tit for Tat)
-numberOf_TFTdc =  16  # Tester TFT (defect, cooperate, then Tit for Tat)
+numberOf_TFTdc =  16   # Tester TFT (defect, cooperate, then Tit for Tat)
 numberOf_GRIM  =  16   # Cooperate, but always defect if opponent defects
 # Default culling amount:
-cull = 6
+cull = 5
 # Default iteration parameters:
-iterations = 15  # The number of times each agent interacts with one another.
-rounds     = 10  # The number of rounds that the simulation will run.
+iterations = 10  # The number of times each agent interacts with one another.
+rounds     = 42  # The number of rounds that the simulation will run.
 
 # Read argv, change default values accordingly:
 #print(argv)
@@ -69,12 +69,12 @@ if '-r' in argv:
 
 # Error checking (PD preferences, culling amount, anything else?):
 if dc > cc and cc > dd and dd > cd:
-    print("Prisoner's Dilemma preferences verified.")
+    if VERBOSE: print("Prisoner's Dilemma preferences verified.")
 # If not PD preferences, need user response...
 N = (numberOf_allC + numberOf_TFT + numberOf_TFTd + numberOf_TFTdc +
      numberOf_GRIM + numberOf_allD)
-if cull > N:
-    print("The culling amount must be less than the total number of agents.")
+if cull > N/2:
+    print("The culling amount must be less than half the total number of agents.")
     exit()
 
 # Set up attributes for each agent and create agents according to initial
@@ -177,6 +177,7 @@ distribution = [
   (GRIM , numberOf_GRIM)
   ),
 ]
+averageScore = []
 
 ############################### FUNCTIONS BEGIN ###############################
 # Count strategy types in agents list:
@@ -211,6 +212,23 @@ def printCurrentDistributionAsWholeTable():
     for type,count in currentDistribution:
         print("%25s : %5d" % (type['name'],count) )
 
+# Print history of strategy distributions with average score:
+def printDistributionHistory():
+    header='Round: --- allC  allD   TFT  TFTd TFTdc  GRIM --- Average Score'
+    print(header)
+    for i in range(r):
+        print(
+            '%5d:    %5d %5d %5d %5d %5d %5d     %13d'
+            %
+            (i,
+            distribution[i][0][1],
+            distribution[i][1][1],
+            distribution[i][2][1],
+            distribution[i][3][1],
+            distribution[i][4][1],
+            distribution[i][5][1],
+            averageScore[i])
+        )
 
 # Play iterations of the PD game, updating score of agents:
 def playIPDgame(node_A,node_B):
@@ -276,6 +294,13 @@ def stageGamePayoffs(action_A,action_B):
         score_B = dc
     return(score_A,score_B)
 
+# Record average score:
+def calculateAverageScore():
+    scores = []
+    for n in G:
+        scores.append(G.node[n]['score'])
+    return(sum(scores)/len(scores))
+
 # Culling and seeding at the end of a round:
 def cullingAndSeeding():
     # This culling method has two random components.
@@ -296,13 +321,17 @@ def cullingAndSeeding():
         if x[1] == bestLowScore:
             cullList.append(x)
             seedList.remove(x)
-    if len(seedList) == 0: return(0)  # All agents have the same score
+    for n in G:
+        G.node[n]['score'] = 0
+    if len(seedList) == 0: # All agents have the same score; don't cull
+        return(0)
     for i in range(len(cullList)-cull):
         cullList.remove(choice(cullList))
     for i in range(len(seedList)-cull):
         seedList.remove(choice(seedList))
-    for n in G:
-        G.node[n]['score'] = 0
+    if len(seedList) < len(cullList):
+        for i in range(len(cullList)-len(seedList)):
+            seedList.append(choice(cullList))
     for i,(n,score,type) in enumerate(cullList):
         agent = {'score':0}
         if seedList[i][2] == 'allC' : agent.update(allC)
@@ -312,16 +341,11 @@ def cullingAndSeeding():
         if seedList[i][2] == 'TFTdc': agent.update(TFTdc)
         if seedList[i][2] == 'GRIM' : agent.update(GRIM)
         G.node[n] = agent
-    # For swapping node attributes:
-    # G.node[nodeNumber] = {new attribute dictionary}
     return(0)
-
-
 ################################ FUNCTIONS END ################################
 
 
 ############################ CORE SIMULATION BEGINS ############################
-# 1 - Pair each agent i with each *other* agent j to play the stage game t times
 r = 0
 while r < rounds:
     for (node_A,node_B) in G.edges():
@@ -331,20 +355,16 @@ while r < rounds:
         for n in G:
             print("Node %3d (%5s): %5d" %
             (n,G.node[n]['abbr'],G.node[n]['score']) )
+    averageScore.append(calculateAverageScore())
     cullingAndSeeding()
+    distribution.append(updateDistribution())
     r += 1
+printDistributionHistory()
 
-# 2 - Once all loops for (1) are complete, sort by score, cull and seed
-
-
-# 3 - Do (1) and (2) over r rounds, outputing changed distribution of
-#     strategies for each round
-distribution.append(updateDistribution())
 
 # For error checking:
 if VERBOSE:
     printCurrentDistributionAsWholeTable()
-
 ############################# CORE SIMULATION ENDS #############################
 
 
@@ -362,3 +382,4 @@ if VERBOSE:
 #                        Iterating over edges, agents play IPD & tally scores
 #                        Added command-line functionality
 #                        Added cullingAndSeeding function, finishing main prog
+#                        Added output for main prog. Fully functional!
