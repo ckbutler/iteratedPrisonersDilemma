@@ -5,10 +5,12 @@
 #   <- Add description of what the script does and how to use it.
 #
 # SYNTAX
-#   <- Add generic syntax, including optional arguments.
 #   python ipdsim.py
 #   python ipdsim.py -p dc cc dd cd
 #   python ipdsim.py -s allC allD TFT TFTd TFTdc GRIM
+#   python ipdsim.py -c cull
+#   python ipdsim.py -i iterations
+#   python ipdsim.py -r rounds
 #
 # EXAMPLES
 #   <- If appropriate, add example syntax with notes.
@@ -17,7 +19,7 @@
 ################################################################################
 
 from sys import argv
-import random
+from random import choice
 import networkx as nx
 
 VERBOSE = True
@@ -39,15 +41,11 @@ numberOf_GRIM  =  16   # Cooperate, but always defect if opponent defects
 # Default culling amount:
 cull = 6
 # Default iteration parameters:
-iterations =  5  # The number of times each agent interacts with one another.
-periods    =  1  # The number of periods that the simulation will run.
-# Default re-seeding method:
-# 0 = proportional to initial distribution;
-# 1 = proportional to end-of-period distribution.
-seed = 1
+iterations = 15  # The number of times each agent interacts with one another.
+rounds     = 10  # The number of rounds that the simulation will run.
 
 # Read argv, change default values accordingly:
-print(argv)
+#print(argv)
 if '-p' in argv:
     payoffList = argv[argv.index('-p')+1:argv.index('-p')+5]
     dc = int(payoffList[0])
@@ -62,6 +60,12 @@ if '-s' in argv:
     numberOf_TFTd  = int(strategyDistribution[3])
     numberOf_TFTdc = int(strategyDistribution[4])
     numberOf_GRIM  = int(strategyDistribution[5])
+if '-c' in argv:
+    cull = int(argv[argv.index('-c')+1])
+if '-i' in argv:
+    iterations = int(argv[argv.index('-i')+1])
+if '-r' in argv:
+    rounds = int(argv[argv.index('-r')+1])
 
 # Error checking (PD preferences, culling amount, anything else?):
 if dc > cc and cc > dd and dd > cd:
@@ -158,13 +162,9 @@ for i in range(numberOf_GRIM):
   agent = {'score':0}
   agent.update(GRIM)
   agents.append(agent)
-H = nx.complete_graph(len(agents))
-G = nx.Graph()
+G = nx.complete_graph(len(agents))
 for i,agent in enumerate(agents):
-    G.add_node(i,agent)
-G.add_edges_from(H.edges())
-
-
+    G.node[i] = agent
 
 # Create structures for tracking play:
 distribution = [
@@ -207,7 +207,7 @@ def updateDistribution():
 # Print current distribution to screen as whole table:
 def printCurrentDistributionAsWholeTable():
     currentDistribution = distribution[-1]
-    print('\nEnd of period distribution of strategies:')
+    print('\nEnd of round distribution of strategies:')
     for type,count in currentDistribution:
         print("%25s : %5d" % (type['name'],count) )
 
@@ -276,8 +276,44 @@ def stageGamePayoffs(action_A,action_B):
         score_B = dc
     return(score_A,score_B)
 
-# Culling and seeding at the end of a period:
+# Culling and seeding at the end of a round:
 def cullingAndSeeding():
+    # This culling method has two random components.
+    # First, if there are ties wrt bestLowScore, all agents with that
+    # bestLowScore are susceptible to culling.
+    # Second, all agents with a score greater than the bestLowScore have an
+    # equal chance of re-seeding for the culled agents.
+    # Final note: if changing the graph from a complete graph, this culling
+    # method should be adjusted for the number of edges each node has.
+    scoreList = []
+    for n in G:
+        scoreList.append( (n,G.node[n]['score'],G.node[n]['abbr']) )
+    scoreList = sorted(scoreList, key=lambda x: x[1])
+    cullList = scoreList[:cull]
+    seedList = scoreList[cull:]
+    bestLowScore = cullList[-1][1]
+    for x in scoreList[cull:]:
+        if x[1] == bestLowScore:
+            cullList.append(x)
+            seedList.remove(x)
+    if len(seedList) == 0: return(0)  # All agents have the same score
+    for i in range(len(cullList)-cull):
+        cullList.remove(choice(cullList))
+    for i in range(len(seedList)-cull):
+        seedList.remove(choice(seedList))
+    for n in G:
+        G.node[n]['score'] = 0
+    for i,(n,score,type) in enumerate(cullList):
+        agent = {'score':0}
+        if seedList[i][2] == 'allC' : agent.update(allC)
+        if seedList[i][2] == 'allD' : agent.update(allD)
+        if seedList[i][2] == 'TFT'  : agent.update(TFT)
+        if seedList[i][2] == 'TFTd' : agent.update(TFTd)
+        if seedList[i][2] == 'TFTdc': agent.update(TFTdc)
+        if seedList[i][2] == 'GRIM' : agent.update(GRIM)
+        G.node[n] = agent
+    # For swapping node attributes:
+    # G.node[nodeNumber] = {new attribute dictionary}
     return(0)
 
 
@@ -286,23 +322,23 @@ def cullingAndSeeding():
 
 ############################ CORE SIMULATION BEGINS ############################
 # 1 - Pair each agent i with each *other* agent j to play the stage game t times
-p = 0
-while p < periods:
+r = 0
+while r < rounds:
     for (node_A,node_B) in G.edges():
         playIPDgame(node_A,node_B)
     if VERBOSE:
-        print("\nEnd of period scores:")
+        print("\nEnd of round scores:")
         for n in G:
             print("Node %3d (%5s): %5d" %
             (n,G.node[n]['abbr'],G.node[n]['score']) )
     cullingAndSeeding()
-    p += 1
+    r += 1
 
 # 2 - Once all loops for (1) are complete, sort by score, cull and seed
 
 
-# 3 - Do (1) and (2) over p periods, outputing changed distribution of
-#     strategies for each period
+# 3 - Do (1) and (2) over r rounds, outputing changed distribution of
+#     strategies for each round
 distribution.append(updateDistribution())
 
 # For error checking:
@@ -321,7 +357,8 @@ if VERBOSE:
 #                        Added strategy dictionaries and some error checking
 # 08-03-2016 CK Butler   Created agents' list & function for counting strategies
 #                        Changed agents' structure to be dictionaries
-#                        Created function for appropriate pairings per period
+#                        Created function for appropriate pairings per round
 # 08-04-2016 CK Butler   Changed structure from lists to networkx
 #                        Iterating over edges, agents play IPD & tally scores
 #                        Added command-line functionality
+#                        Added cullingAndSeeding function, finishing main prog
