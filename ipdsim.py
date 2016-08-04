@@ -7,6 +7,8 @@
 # SYNTAX
 #   <- Add generic syntax, including optional arguments.
 #   python ipdsim.py
+#   python ipdsim.py -p dc cc dd cd
+#   python ipdsim.py -s allC allD TFT TFTd TFTdc GRIM
 #
 # EXAMPLES
 #   <- If appropriate, add example syntax with notes.
@@ -14,42 +16,56 @@
 
 ################################################################################
 
-import sys
+from sys import argv
 import random
 import networkx as nx
 
 VERBOSE = True
 
-# Read argv:  #Perhaps move reading of command-line arguments after defaults.
-
-
-# If argv==1, use default values for payoffs, initial distribution of
-# strategies, culling threshold, iteration parameters, and re-seeding method:
+# Default values for payoffs, initial distribution of strategies,
+# culling threshold, iteration parameters, and re-seeding method:
 # Default payoffs:
 dc = 5 # Temptation for defection
 cc = 3 # Reward for cooperation
 dd = 1 # Punishment for defection
 cd = 0 # Sucker's payoff
 # Default initial distribution of strategies:
-numberOf_allC  =  20   # Always cooperate
-numberOf_allD  =  10   # Always defect
-numberOf_TFT   =  10   # Tit for Tat
-numberOf_TFTd  =  10   # Simple Tester Tit for Tat (defect, then Tit for Tat)
-numberOf_TFTdc =   0   # Tester TFT (defect, cooperate, then Tit for Tat)
-numberOf_GRIM  =   0   # Cooperate, but always defect if opponent defects
+numberOf_allC  =  16   # Always cooperate
+numberOf_allD  =  20   # Always defect
+numberOf_TFT   =  16   # Tit for Tat
+numberOf_TFTd  =  16   # Simple Tester Tit for Tat (defect, then Tit for Tat)
+numberOf_TFTdc =  16  # Tester TFT (defect, cooperate, then Tit for Tat)
+numberOf_GRIM  =  16   # Cooperate, but always defect if opponent defects
 # Default culling amount:
 cull = 6
 # Default iteration parameters:
-iterations = 10  # The number of times each agent interactions with one another.
-periods    = 15  # The number of periods that the simulation will run.
+iterations =  5  # The number of times each agent interacts with one another.
+periods    =  1  # The number of periods that the simulation will run.
 # Default re-seeding method:
 # 0 = proportional to initial distribution;
 # 1 = proportional to end-of-period distribution.
 seed = 1
 
+# Read argv, change default values accordingly:
+print(argv)
+if '-p' in argv:
+    payoffList = argv[argv.index('-p')+1:argv.index('-p')+5]
+    dc = int(payoffList[0])
+    cc = int(payoffList[1])
+    dd = int(payoffList[2])
+    cd = int(payoffList[3])
+if '-s' in argv:
+    strategyDistribution = argv[argv.index('-s')+1:argv.index('-s')+7]
+    numberOf_allC  = int(strategyDistribution[0])
+    numberOf_allD  = int(strategyDistribution[1])
+    numberOf_TFT   = int(strategyDistribution[2])
+    numberOf_TFTd  = int(strategyDistribution[3])
+    numberOf_TFTdc = int(strategyDistribution[4])
+    numberOf_GRIM  = int(strategyDistribution[5])
+
 # Error checking (PD preferences, culling amount, anything else?):
 if dc > cc and cc > dd and dd > cd:
-    print("Prisoner's Dilemma verified.")
+    print("Prisoner's Dilemma preferences verified.")
 # If not PD preferences, need user response...
 N = (numberOf_allC + numberOf_TFT + numberOf_TFTd + numberOf_TFTdc +
      numberOf_GRIM + numberOf_allD)
@@ -191,16 +207,78 @@ def updateDistribution():
 # Print current distribution to screen as whole table:
 def printCurrentDistributionAsWholeTable():
     currentDistribution = distribution[-1]
+    print('\nEnd of period distribution of strategies:')
     for type,count in currentDistribution:
         print("%25s : %5d" % (type['name'],count) )
 
 
 # Play iterations of the PD game, updating score of agents:
-def playIPDgame():
+def playIPDgame(node_A,node_B):
+    history_A = []  # History of A's actions
+    history_B = []  # History of B's actions
+    for i in range(iterations):
+        action_A=action_B=''
+        if i == 0:
+            action_A = G.node[node_A]['firstMove']
+            action_B = G.node[node_B]['firstMove']
+        if i == 1:
+            if history_B[-1] == 'C':
+                action_A = G.node[node_A]['react_C']
+            else:
+                action_A = G.node[node_A]['react_D']
+            if history_A[-1] == 'C':
+                action_B = G.node[node_B]['react_C']
+            else:
+                action_B = G.node[node_B]['react_D']
+            if 'reactEverD' in G.node[node_A] and 'D' in history_B:
+                action_A = G.node[node_A]['reactEverD']
+            if 'reactEverD' in G.node[node_B] and 'D' in history_A:
+                action_B = G.node[node_B]['reactEverD']
+            if 'secondMove' in G.node[node_A]:
+                action_A = G.node[node_A]['secondMove']
+            if 'secondMove' in G.node[node_B]:
+                action_B = G.node[node_B]['secondMove']
+        if i>1:
+            if history_B[-1] == 'C':
+                action_A = G.node[node_A]['react_C']
+            else:
+                action_A = G.node[node_A]['react_D']
+            if history_A[-1] == 'C':
+                action_B = G.node[node_B]['react_C']
+            else:
+                action_B = G.node[node_B]['react_D']
+            if 'reactEverD' in G.node[node_A] and 'D' in history_B:
+                action_A = G.node[node_A]['reactEverD']
+            if 'reactEverD' in G.node[node_B] and 'D' in history_A:
+                action_B = G.node[node_B]['reactEverD']
+        history_A.append(action_A)
+        history_B.append(action_B)
+        (score_A,score_B) = stageGamePayoffs(action_A,action_B)
+        G.node[node_A]['score']+=score_A
+        G.node[node_B]['score']+=score_B
     return(0)
 
+# Return score from stage game given actions:
+def stageGamePayoffs(action_A,action_B):
+    score_A=0
+    score_B=0
+    if action_A == 'D' and action_B == 'C':
+        score_A = dc
+        score_B = cd
+    if action_A == 'C' and action_B == 'C':
+        score_A = cc
+        score_B = cc
+    if action_A == 'D' and action_B == 'D':
+        score_A = dd
+        score_B = dd
+    if action_A == 'C' and action_B == 'D':
+        score_A = cd
+        score_B = dc
+    return(score_A,score_B)
 
 # Culling and seeding at the end of a period:
+def cullingAndSeeding():
+    return(0)
 
 
 ################################ FUNCTIONS END ################################
@@ -208,7 +286,17 @@ def playIPDgame():
 
 ############################ CORE SIMULATION BEGINS ############################
 # 1 - Pair each agent i with each *other* agent j to play the stage game t times
-for
+p = 0
+while p < periods:
+    for (node_A,node_B) in G.edges():
+        playIPDgame(node_A,node_B)
+    if VERBOSE:
+        print("\nEnd of period scores:")
+        for n in G:
+            print("Node %3d (%5s): %5d" %
+            (n,G.node[n]['abbr'],G.node[n]['score']) )
+    cullingAndSeeding()
+    p += 1
 
 # 2 - Once all loops for (1) are complete, sort by score, cull and seed
 
@@ -235,3 +323,5 @@ if VERBOSE:
 #                        Changed agents' structure to be dictionaries
 #                        Created function for appropriate pairings per period
 # 08-04-2016 CK Butler   Changed structure from lists to networkx
+#                        Iterating over edges, agents play IPD & tally scores
+#                        Added command-line functionality
