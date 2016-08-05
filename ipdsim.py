@@ -19,10 +19,11 @@
 ################################################################################
 
 from sys import argv
-from random import choice
+from random import choice, seed
 import networkx as nx
 
-VERBOSE = False
+VERBOSE = True
+if VERBOSE: seed(71)
 
 # Default values for payoffs, initial distribution of strategies,
 # culling threshold, iteration parameters, and re-seeding method:
@@ -41,7 +42,7 @@ numberOf_GRIM  =  16   # Cooperate, but always defect if opponent defects
 # Default culling amount:
 cull = 5
 # Default iteration parameters:
-iterations = 10  # The number of times each agent interacts with one another.
+iterations = 15  # The number of times each agent interacts with one another.
 rounds     = 42  # The number of rounds that the simulation will run.
 
 # Read argv, change default values accordingly:
@@ -66,6 +67,9 @@ if '-i' in argv:
     iterations = int(argv[argv.index('-i')+1])
 if '-r' in argv:
     rounds = int(argv[argv.index('-r')+1])
+if '-seed' in argv:
+    randomizationSeed = int(argv[argv.index('-seed')+1])
+    seed(randomizationSeed)
 
 # Error checking (PD preferences, culling amount, anything else?):
 if dc > cc and cc > dd and dd > cd:
@@ -303,7 +307,8 @@ def calculateAverageScore():
 
 # Culling and seeding at the end of a round:
 def cullingAndSeeding():
-    # This culling method has two random components.
+    # This culling method removes all agents will very low scores.
+    # There remain two random components.
     # First, if there are ties wrt bestLowScore, all agents with that
     # bestLowScore are susceptible to culling.
     # Second, all agents with a score greater than the bestLowScore have an
@@ -314,24 +319,34 @@ def cullingAndSeeding():
     for n in G:
         scoreList.append( (n,G.node[n]['score'],G.node[n]['abbr']) )
     scoreList = sorted(scoreList, key=lambda x: x[1])
+    for n in G:  # Reset agent scores to 0 once scores in scoreList
+        G.node[n]['score'] = 0
     cullList = scoreList[:cull]
     seedList = scoreList[cull:]
+    lowScore = cullList[0][1]
     bestLowScore = cullList[-1][1]
-    for x in scoreList[cull:]:
-        if x[1] == bestLowScore:
-            cullList.append(x)
-            seedList.remove(x)
-    for n in G:
-        G.node[n]['score'] = 0
-    if len(seedList) == 0: # All agents have the same score; don't cull
+    highScore = seedList[-1][1]
+    if lowScore == bestLowScore and bestLowScore == highScore:
+        # All agents have the same score; don't cull
         return(0)
-    for i in range(len(cullList)-cull):
-        cullList.remove(choice(cullList))
-    for i in range(len(seedList)-cull):
-        seedList.remove(choice(seedList))
-    if len(seedList) < len(cullList):
-        for i in range(len(cullList)-len(seedList)):
-            seedList.append(choice(cullList))
+    straddlingList = []
+    for x in scoreList:
+        if x[1] == bestLowScore:
+            straddlingList.append(x)
+            try: cullList.remove(x)
+            except ValueError: pass
+            try: seedList.remove(x)
+            except ValueError: pass
+    while len(cullList) < cull:
+        x = choice(straddlingList)
+        cullList.append(x)
+        straddlingList.remove(x)
+    for x in straddlingList:
+        seedList.append(x)
+    if VERBOSE:
+        print('')
+        print(len(cullList),len(straddlingList),len(seedList))
+        print(lowScore, bestLowScore, highScore)
     for i,(n,score,type) in enumerate(cullList):
         agent = {'score':0}
         if seedList[i][2] == 'allC' : agent.update(allC)
@@ -383,3 +398,4 @@ if VERBOSE:
 #                        Added command-line functionality
 #                        Added cullingAndSeeding function, finishing main prog
 #                        Added output for main prog. Fully functional!
+# 08-05-2016 CK Butler   Changed culling method to eliminate all lowScore agents
