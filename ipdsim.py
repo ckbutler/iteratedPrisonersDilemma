@@ -6,11 +6,13 @@
 #
 # SYNTAX
 #   python ipdsim.py
+#   python ipdsim.py -help [or --help]
 #   python ipdsim.py -p dc cc dd cd
 #   python ipdsim.py -s allC allD TFT TFTd TFTdc GRIM
 #   python ipdsim.py -c cull
 #   python ipdsim.py -i iterations
 #   python ipdsim.py -r rounds
+#   python ipdsim.py -seed randomizationNumber
 #
 # EXAMPLES
 #   <- If appropriate, add example syntax with notes.
@@ -22,12 +24,11 @@ from sys import argv
 from random import choice, seed
 import networkx as nx
 
-VERBOSE = True
-if VERBOSE: seed(71)
+VERBOSE = False
 
 # Default values for payoffs, initial distribution of strategies,
 # culling threshold, iteration parameters, and re-seeding method:
-# Default payoffs:
+# Default payoffs (from Axelrod):
 dc = 5 # Temptation for defection
 cc = 3 # Reward for cooperation
 dd = 1 # Punishment for defection
@@ -47,33 +48,124 @@ rounds     = 42  # The number of rounds that the simulation will run.
 
 # Read argv, change default values accordingly:
 #print(argv)
+if '-h' in argv or '-help' in argv or '--help' in argv:
+    print("This program examines the Iterated Prisoners' Dilemma game")
+    print("within an evolutionary simulation. Up to six type of strategies")
+    print("play against every other 'agent' in the environment for a fixed")
+    print("number of iterations. At the end of the round, low scoring agents")
+    print("are culled from the environment and replaced randomly by higher")
+    print("scoring agents.\n")
+    print("The six strategies investigated here are as follows:")
+    print("    allC  --- 'Naive cooperator' always plays 'cooperate';")
+    print("    allD  --- 'Always defect' always plays 'defect';")
+    print("    TFT   --- 'Tit for Tat' starts with C and then mirrors its opponent;")
+    print("    TFTd  --- 'Simple tester TFT' starts with D and then mirrors its opponent;")
+    print("    TFTdc --- 'Tester TFT' plays D first, C second, and then mirrors its opponent;")
+    print("    GRIM  --- 'Grim Trigger' starts and continues with C unless its opponent ever played D.\n")
+    print("To run the program with default values, use the syntax:")
+    print("    python ipdsim.py\n")
+    print("To alter the payoffs of the stage game, use the syntax:")
+    print("    python ipdsim.py -p dc cc dd cd")
+    print("    NOTE: The payoffs dc, cc, dd, and cd are integers and")
+    print("          are from the row player's perspective. Four values must be")
+    print("           given in the respective order.\n")
+    print("To alter the initial distribution of strategies, use the syntax:")
+    print("    python ipdsim.py -s allC allD TFT TFTd TFTdc GRIM")
+    print("    NOTE: allC, allD, etc. are integers. Six values must be given")
+    print("          in the respective order.\n")
+    print("To alter the number of agents culled at the end of each round:")
+    print("    python ipdsim.py -c cull")
+    print("        where 'cull' is a positive integer and less that half of all agents.\n")
+    print("To alter the number of times each agent plays another agent each round:")
+    print("    python ipdsim.py -i iterations")
+    print("        where 'iterations' is a positive integer.\n")
+    print("To alter the number of rounds that the simulation runs:")
+    print("    python ipdsim.py -r rounds")
+    print("        where 'rounds' is a positive integer.\n")
+    print("Optional arguments may be combined in any order, for example:")
+    print("    python ipdsim.py -s 10 10 10 10 10 10 -r 11")
+    exit()
 if '-p' in argv:
-    payoffList = argv[argv.index('-p')+1:argv.index('-p')+5]
-    dc = int(payoffList[0])
-    cc = int(payoffList[1])
-    dd = int(payoffList[2])
-    cd = int(payoffList[3])
+    try:
+        payoffList = argv[argv.index('-p')+1:argv.index('-p')+5]
+        dc = int(payoffList[0])
+        cc = int(payoffList[1])
+        dd = int(payoffList[2])
+        cd = int(payoffList[3])
+    except (ValueError, IndexError):
+        print("To alter the payoffs of the stage game, use the syntax:")
+        print("    python ipdsim.py -p dc cc dd cd")
+        print("    NOTE: The payoffs dc, cc, dd, and cd are integers and")
+        print("          are from the row player's perspective. Four values must be")
+        print("           given in the respective order.\n")
+        print("    EXAMPLE:")
+        print("    python ipdsim.py -p 10 5 0 -2\n")
+        print("    NOTE: Prisoners' Dilemma preferences require")
+        print("          dc > cc > dd > cd")
+        exit()
 if '-s' in argv:
-    strategyDistribution = argv[argv.index('-s')+1:argv.index('-s')+7]
-    numberOf_allC  = int(strategyDistribution[0])
-    numberOf_allD  = int(strategyDistribution[1])
-    numberOf_TFT   = int(strategyDistribution[2])
-    numberOf_TFTd  = int(strategyDistribution[3])
-    numberOf_TFTdc = int(strategyDistribution[4])
-    numberOf_GRIM  = int(strategyDistribution[5])
+    try:
+        strategyDistribution = argv[argv.index('-s')+1:argv.index('-s')+7]
+        numberOf_allC  = int(strategyDistribution[0])
+        numberOf_allD  = int(strategyDistribution[1])
+        numberOf_TFT   = int(strategyDistribution[2])
+        numberOf_TFTd  = int(strategyDistribution[3])
+        numberOf_TFTdc = int(strategyDistribution[4])
+        numberOf_GRIM  = int(strategyDistribution[5])
+    except (ValueError, IndexError):
+        print("To alter the initial distribution of strategies, use the syntax:")
+        print("    python ipdsim.py -s allC allD TFT TFTd TFTdc GRIM")
+        print("    NOTE: allC, allD, etc. are integers. Six values must be given")
+        print("          in the respective order.\n")
+        print("    EXAMPLES:")
+        print("    python ipdsim.py -s 99 1 0 0 0 0")
+        print("    python ipdsim.py -s 45 5 45 0 0 0")
+        print("    python ipdsim.py -s 33 33 33 0 0 0")
+        print("    python ipdsim.py -s 20 0 20 20 20 20")
+        print("    python ipdsim.py -s 25 0 25 25 25 0")
+        exit()
 if '-c' in argv:
-    cull = int(argv[argv.index('-c')+1])
+    try:
+        cull = int(argv[argv.index('-c')+1])
+    except ValueError:
+        print("To alter the number of agents culled at the end of each round:")
+        print("    python ipdsim.py -c cull")
+        print("        where 'cull' is a positive integer and less that half of all agents.\n")
+        exit()
 if '-i' in argv:
-    iterations = int(argv[argv.index('-i')+1])
+    try:
+        iterations = int(argv[argv.index('-i')+1])
+    except ValueError:
+        print("To alter the number of times each agent plays another agent each round:")
+        print("    python ipdsim.py -i iterations")
+        print("        where 'iterations' is a positive integer.\n")
+        exit()
 if '-r' in argv:
-    rounds = int(argv[argv.index('-r')+1])
+    try:
+        rounds = int(argv[argv.index('-r')+1])
+    except ValueError:
+        print("To alter the number of rounds that the simulation runs:")
+        print("    python ipdsim.py -r rounds")
+        print("        where 'rounds' is a positive integer.\n")
+        exit()
 if '-seed' in argv:
-    randomizationSeed = int(argv[argv.index('-seed')+1])
-    seed(randomizationSeed)
+    try:
+        randomizationSeed = int(argv[argv.index('-seed')+1])
+        seed(randomizationSeed)
+    except ValueError:
+        print("ADVANCED OPTION:")
+        print("To set the randomization seed (forcing the same random choices each run):")
+        print("    python ipdsim.py -seed randomizationNumber")
+        exit()
 
 # Error checking (PD preferences, culling amount, anything else?):
 if dc > cc and cc > dd and dd > cd:
-    if VERBOSE: print("Prisoner's Dilemma preferences verified.")
+    if VERBOSE: print("Prisoners' Dilemma preferences verified.")
+else:
+    print("Payoffs dc=%d, cc=%d, dd=%d, cd=%d do not conform to Prisoners' Dilemma preferences."
+          %
+          (dc,cc,dd,cd)
+    )
 # If not PD preferences, need user response...
 N = (numberOf_allC + numberOf_TFT + numberOf_TFTd + numberOf_TFTdc +
      numberOf_GRIM + numberOf_allD)
@@ -399,3 +491,4 @@ if VERBOSE:
 #                        Added cullingAndSeeding function, finishing main prog
 #                        Added output for main prog. Fully functional!
 # 08-05-2016 CK Butler   Changed culling method to eliminate all lowScore agents
+#                        Added help and exception trapping
