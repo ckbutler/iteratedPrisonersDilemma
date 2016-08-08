@@ -8,7 +8,7 @@
 #   python ipdsim.py
 #   python ipdsim.py -help [or --help]
 #   python ipdsim.py -p dc cc dd cd
-#   python ipdsim.py -s allC allD TFT TFTd TFTdc GRIM
+#   python ipdsim.py -s allC allD TFT TFTd TFTdcc GRIM
 #   python ipdsim.py -c cull
 #   python ipdsim.py -i iterations
 #   python ipdsim.py -r rounds
@@ -19,12 +19,17 @@
 #   python ipdsim.py                 # Runs simulation with default parameters.
 
 ################################################################################
+VERBOSE = True
+
+if VERBOSE: print('Starting program')
 
 from sys import argv
 from random import choice, seed
 import networkx as nx
 
-VERBOSE = False
+DEBUGGING = False
+
+if VERBOSE: print('Loading parameters')
 
 # Default values for payoffs, initial distribution of strategies,
 # culling threshold, iteration parameters, and re-seeding method:
@@ -34,17 +39,17 @@ cc = 3 # Reward for cooperation
 dd = 1 # Punishment for defection
 cd = 0 # Sucker's payoff
 # Default initial distribution of strategies:
-numberOf_allC  =  16   # Always cooperate
-numberOf_allD  =  20   # Always defect
-numberOf_TFT   =  16   # Tit for Tat
-numberOf_TFTd  =  16   # Simple Tester Tit for Tat (defect, then Tit for Tat)
-numberOf_TFTdc =  16   # Tester TFT (defect, cooperate, then Tit for Tat)
-numberOf_GRIM  =  16   # Cooperate, but always defect if opponent defects
+numberOf_allC   =  16   # Always cooperate
+numberOf_allD   =  20   # Always defect
+numberOf_TFT    =  16   # Tit for Tat
+numberOf_TFTd   =  16   # Simple Tester Tit for Tat (defect, then Tit for Tat)
+numberOf_TFTdcc =  16   # Tester TFT (defect, cooperate, then Tit for Tat)
+numberOf_GRIM   =  16   # Cooperate, but always defect if opponent defects
 # Default culling amount:
 cull = 5
 # Default iteration parameters:
 iterations = 15  # The number of times each agent interacts with one another.
-rounds     = 42  # The number of rounds that the simulation will run.
+rounds     = 26  # The number of rounds that the simulation will run.
 
 # Read argv, change default values accordingly:
 #print(argv)
@@ -60,7 +65,7 @@ if '-h' in argv or '-help' in argv or '--help' in argv:
     print("    allD  --- 'Always defect' always plays 'defect';")
     print("    TFT   --- 'Tit for Tat' starts with C and then mirrors its opponent;")
     print("    TFTd  --- 'Simple tester TFT' starts with D and then mirrors its opponent;")
-    print("    TFTdc --- 'Tester TFT' plays D first, C second, and then mirrors its opponent;")
+    print("    TFTdcc --- 'Tester TFT' plays D first, C twice, and then mirrors its opponent;")
     print("    GRIM  --- 'Grim Trigger' starts and continues with C unless its opponent ever played D.\n")
     print("To run the program with default values, use the syntax:")
     print("    python ipdsim.py\n")
@@ -70,7 +75,7 @@ if '-h' in argv or '-help' in argv or '--help' in argv:
     print("          are from the row player's perspective. Four values must be")
     print("           given in the respective order.\n")
     print("To alter the initial distribution of strategies, use the syntax:")
-    print("    python ipdsim.py -s allC allD TFT TFTd TFTdc GRIM")
+    print("    python ipdsim.py -s allC allD TFT TFTd TFTdcc GRIM")
     print("    NOTE: allC, allD, etc. are integers. Six values must be given")
     print("          in the respective order.\n")
     print("To alter the number of agents culled at the end of each round:")
@@ -110,11 +115,11 @@ if '-s' in argv:
         numberOf_allD  = int(strategyDistribution[1])
         numberOf_TFT   = int(strategyDistribution[2])
         numberOf_TFTd  = int(strategyDistribution[3])
-        numberOf_TFTdc = int(strategyDistribution[4])
+        numberOf_TFTdcc = int(strategyDistribution[4])
         numberOf_GRIM  = int(strategyDistribution[5])
     except (ValueError, IndexError):
         print("To alter the initial distribution of strategies, use the syntax:")
-        print("    python ipdsim.py -s allC allD TFT TFTd TFTdc GRIM")
+        print("    python ipdsim.py -s allC allD TFT TFTd TFTdcc GRIM")
         print("    NOTE: allC, allD, etc. are integers. Six values must be given")
         print("          in the respective order.\n")
         print("    EXAMPLES:")
@@ -158,21 +163,24 @@ if '-seed' in argv:
         print("    python ipdsim.py -seed randomizationNumber")
         exit()
 
+if VERBOSE: print('Checking parameters')
+
 # Error checking (PD preferences, culling amount, anything else?):
 if dc > cc and cc > dd and dd > cd:
-    if VERBOSE: print("Prisoners' Dilemma preferences verified.")
+    if DEBUGGING: print("Prisoners' Dilemma preferences verified.")
 else:
     print("Payoffs dc=%d, cc=%d, dd=%d, cd=%d do not conform to Prisoners' Dilemma preferences."
           %
           (dc,cc,dd,cd)
     )
 # If not PD preferences, need user response...
-N = (numberOf_allC + numberOf_TFT + numberOf_TFTd + numberOf_TFTdc +
+N = (numberOf_allC + numberOf_TFT + numberOf_TFTd + numberOf_TFTdcc +
      numberOf_GRIM + numberOf_allD)
 if cull > N/2:
     print("The culling amount must be less than half the total number of agents.")
     exit()
 
+if VERBOSE: print('Loading strategies')
 # Set up attributes for each agent and create agents according to initial
 # distribution of strategies:
 # An IPD strategy is defined by (1) its initial move {C/D}, (2) whether it
@@ -181,7 +189,7 @@ if cull > N/2:
 # If it's not contingent, what it's current move is given its non-contingent
 # pattern of moves.
 # A strategy can also be programmed to do non-contingent moves beyond the first
-# move and then become contingent. E.G., TFTdc could defect on the first move,
+# move and then become contingent. E.G., TFTdcc could defect on the first move,
 # cooperate on the second move, and then play normal TFT.
 # Simple non-contingent strategies of allC and allD can be programmed as if
 # they are reacting to the last move (react_C and react_D).
@@ -215,13 +223,14 @@ TFTd = {
   'react_D':   'D'
   }
 # Create more nuanced strategies:
-TFTdc = {
+TFTdcc = {
   'name':      'Tester Tit-for-Tat',
-  'abbr':      'TFTdc',
+  'abbr':      'TFTdcc',
   'firstMove': 'D',
   'react_C':   'C',
   'react_D':   'D',
-  'secondMove':'C'
+  'secondMove':'C',
+  'thirdMove': 'C'
   }
 GRIM = {
   'name':      'Grim Trigger',
@@ -250,9 +259,9 @@ for i in range(numberOf_TFTd):
   agent = {'score':0}
   agent.update(TFTd)
   agents.append(agent)
-for i in range(numberOf_TFTdc):
+for i in range(numberOf_TFTdcc):
   agent = {'score':0}
-  agent.update(TFTdc)
+  agent.update(TFTdcc)
   agents.append(agent)
 for i in range(numberOf_GRIM):
   agent = {'score':0}
@@ -265,12 +274,12 @@ for i,agent in enumerate(agents):
 # Create structures for tracking play:
 distribution = [
   (
-  (allC , numberOf_allC),
-  (allD , numberOf_allD),
-  (TFT  , numberOf_TFT),
-  (TFTd , numberOf_TFTd),
-  (TFTdc, numberOf_TFTdc),
-  (GRIM , numberOf_GRIM)
+  (allC  , numberOf_allC),
+  (allD  , numberOf_allD),
+  (TFT   , numberOf_TFT),
+  (TFTd  , numberOf_TFTd),
+  (TFTdcc, numberOf_TFTdcc),
+  (GRIM  , numberOf_GRIM)
   ),
 ]
 averageScore = []
@@ -278,26 +287,26 @@ averageScore = []
 ############################### FUNCTIONS BEGIN ###############################
 # Count strategy types in agents list:
 def updateDistribution():
-    count_allC  = 0
-    count_allD  = 0
-    count_TFT   = 0
-    count_TFTd  = 0
-    count_TFTdc = 0
-    count_GRIM  = 0
+    count_allC   = 0
+    count_allD   = 0
+    count_TFT    = 0
+    count_TFTd   = 0
+    count_TFTdcc = 0
+    count_GRIM   = 0
     for n in G:
-        if G.node[n]['abbr'] == 'allC' : count_allC  += 1
-        if G.node[n]['abbr'] == 'allD' : count_allD  += 1
-        if G.node[n]['abbr'] == 'TFT'  : count_TFT   += 1
-        if G.node[n]['abbr'] == 'TFTd' : count_TFTd  += 1
-        if G.node[n]['abbr'] == 'TFTdc': count_TFTdc += 1
-        if G.node[n]['abbr'] == 'GRIM' : count_GRIM  += 1
+        if G.node[n]['abbr'] == 'allC'  : count_allC   += 1
+        if G.node[n]['abbr'] == 'allD'  : count_allD   += 1
+        if G.node[n]['abbr'] == 'TFT'   : count_TFT    += 1
+        if G.node[n]['abbr'] == 'TFTd'  : count_TFTd   += 1
+        if G.node[n]['abbr'] == 'TFTdcc': count_TFTdcc += 1
+        if G.node[n]['abbr'] == 'GRIM'  : count_GRIM   += 1
     tuple = (
-        (allC , count_allC),
-        (allD , count_allD),
-        (TFT  , count_TFT),
-        (TFTd , count_TFTd),
-        (TFTdc, count_TFTdc),
-        (GRIM , count_GRIM)
+        (allC  , count_allC),
+        (allD  , count_allD),
+        (TFT   , count_TFT),
+        (TFTd  , count_TFTd),
+        (TFTdcc, count_TFTdcc),
+        (GRIM  , count_GRIM)
     )
     return(tuple)
 
@@ -310,11 +319,11 @@ def printCurrentDistributionAsWholeTable():
 
 # Print history of strategy distributions with average score:
 def printDistributionHistory():
-    header='Round: --- allC  allD   TFT  TFTd TFTdc  GRIM --- Average Score'
+    header='Round: ---  allC   allD    TFT   TFTd TFTdcc   GRIM --- Average Score'
     print(header)
     for i in range(r):
         print(
-            '%5d:    %5d %5d %5d %5d %5d %5d     %13d'
+            '%5d:    %6d %6d %6d %6d %6d %6d     %13d'
             %
             (i,
             distribution[i][0][1],
@@ -352,7 +361,24 @@ def playIPDgame(node_A,node_B):
                 action_A = G.node[node_A]['secondMove']
             if 'secondMove' in G.node[node_B]:
                 action_B = G.node[node_B]['secondMove']
-        if i>1:
+        if i == 2:
+            if history_B[-1] == 'C':
+                action_A = G.node[node_A]['react_C']
+            else:
+                action_A = G.node[node_A]['react_D']
+            if history_A[-1] == 'C':
+                action_B = G.node[node_B]['react_C']
+            else:
+                action_B = G.node[node_B]['react_D']
+            if 'reactEverD' in G.node[node_A] and 'D' in history_B:
+                action_A = G.node[node_A]['reactEverD']
+            if 'reactEverD' in G.node[node_B] and 'D' in history_A:
+                action_B = G.node[node_B]['reactEverD']
+            if 'thirdMove' in G.node[node_A]:
+                action_A = G.node[node_A]['thirdMove']
+            if 'thirdMove' in G.node[node_B]:
+                action_B = G.node[node_B]['thirdMove']
+        if i>2:
             if history_B[-1] == 'C':
                 action_A = G.node[node_A]['react_C']
             else:
@@ -435,32 +461,33 @@ def cullingAndSeeding():
         straddlingList.remove(x)
     for x in straddlingList:
         seedList.append(x)
-    if VERBOSE:
+    if DEBUGGING:
         print('')
         print(len(cullList),len(straddlingList),len(seedList))
         print(lowScore, bestLowScore, highScore)
     for i,(n,score,type) in enumerate(cullList):
         agent = {'score':0}
-        if seedList[i][2] == 'allC' : agent.update(allC)
-        if seedList[i][2] == 'allD' : agent.update(allD)
-        if seedList[i][2] == 'TFT'  : agent.update(TFT)
-        if seedList[i][2] == 'TFTd' : agent.update(TFTd)
-        if seedList[i][2] == 'TFTdc': agent.update(TFTdc)
-        if seedList[i][2] == 'GRIM' : agent.update(GRIM)
+        if seedList[i][2] == 'allC'  : agent.update(allC)
+        if seedList[i][2] == 'allD'  : agent.update(allD)
+        if seedList[i][2] == 'TFT'   : agent.update(TFT)
+        if seedList[i][2] == 'TFTd'  : agent.update(TFTd)
+        if seedList[i][2] == 'TFTdcc': agent.update(TFTdcc)
+        if seedList[i][2] == 'GRIM'  : agent.update(GRIM)
         G.node[n] = agent
     return(0)
 ################################ FUNCTIONS END ################################
 
 
 ############################ CORE SIMULATION BEGINS ############################
+if VERBOSE: print('Beginning tournament')
 r = 0
 while r < rounds:
     for (node_A,node_B) in G.edges():
         playIPDgame(node_A,node_B)
-    if VERBOSE:
+    if DEBUGGING:
         print("\nEnd of round scores:")
         for n in G:
-            print("Node %3d (%5s): %5d" %
+            print("Node %3d (%6s): %5d" %
             (n,G.node[n]['abbr'],G.node[n]['score']) )
     averageScore.append(calculateAverageScore())
     cullingAndSeeding()
@@ -470,7 +497,7 @@ printDistributionHistory()
 
 
 # For error checking:
-if VERBOSE:
+if DEBUGGING:
     printCurrentDistributionAsWholeTable()
 ############################# CORE SIMULATION ENDS #############################
 
@@ -492,3 +519,4 @@ if VERBOSE:
 #                        Added output for main prog. Fully functional!
 # 08-05-2016 CK Butler   Changed culling method to eliminate all lowScore agents
 #                        Added help and exception trapping
+# 08-06-2016 CK Butler   Changed TFTdc to TFTdcc
