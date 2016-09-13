@@ -468,14 +468,12 @@ def cullingAndSeeding():
         print(lowScore, bestLowScore, highScore)
     for i,(n,score,type) in enumerate(cullList):
         agent = {'score':0}
-        x = choice(seedList)
-        seedList.remove(x)
-        if x[2] == 'allC'  : agent.update(allC)
-        if x[2] == 'allD'  : agent.update(allD)
-        if x[2] == 'TFT'   : agent.update(TFT)
-        if x[2] == 'TFTd'  : agent.update(TFTd)
-        if x[2] == 'TFTdcc': agent.update(TFTdcc)
-        if x[2] == 'GRIM'  : agent.update(GRIM)
+        if seedList[i][2] == 'allC'  : agent.update(allC)
+        if seedList[i][2] == 'allD'  : agent.update(allD)
+        if seedList[i][2] == 'TFT'   : agent.update(TFT)
+        if seedList[i][2] == 'TFTd'  : agent.update(TFTd)
+        if seedList[i][2] == 'TFTdcc': agent.update(TFTdcc)
+        if seedList[i][2] == 'GRIM'  : agent.update(GRIM)
         G.node[n] = agent
     return(0)
 ################################ FUNCTIONS END ################################
@@ -523,4 +521,3 @@ if DEBUGGING:
 # 08-05-2016 CK Butler   Changed culling method to eliminate all lowScore agents
 #                        Added help and exception trapping
 # 08-06-2016 CK Butler   Changed TFTdc to TFTdcc
-# 09-13-2016 CK Butler   Fixed bug of seeding sequentially rather than randomly
